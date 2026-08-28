@@ -1,0 +1,37 @@
+{
+  "jurisdictionName": "Bexar County / City of San Antonio ETJ, TX",
+  "sourceDocument": "City of San Antonio Unified Development Code, Article V (Development Standards), Sec. 35-506 'Transportation', Table 506-3 (Street Design Standards); Supp. No. 22. Road/grade values verified 2026-08-28 against the provided UDC PDF. Parking-lot and driveway-approach slopes are NOT specified in the UDC (see notes) and are left unset pending the COSA Storm Water Design Criteria Manual and TxDOT driveway criteria.",
+  "lastVerifiedDate": "2026-08-28",
+  "statePlaneEpsg": 2278,
+
+  "_comment_scope": "Values below are transcribed from the COSA UDC only. Bexar County unincorporated development in the SA ETJ follows these subdivision/street standards. City limits permit a slightly higher local-street grade (12%) than the ETJ (10%); the ETJ value is used here as the conservative Bexar County default.",
+
+  "_comment_standardParking": "The UDC does NOT specify a parking-lot SURFACE slope max/min. That is governed by the COSA Storm Water / paving design criteria, not the UDC. Left null so the tool's conservative engineering default (5% max / 1% min) applies. Populate once the drainage design manual value is confirmed.",
+  "standardParking": null,
+
+  "driveAisleOrRoad": {
+    "unit": "percent",
+    "maxSlopePct": 10.0,
+    "minSlopePct": 0.5,
+    "notes": "UDC Table 506-3 & Sec 35-506(d)(3): local street max grade 10% in ETJ (12% in city limits); collectors 7%, arterials 5%, alleys 10%. Min grade 0.5% (0.4% permitted with concrete curb & gutter). SEPARATE road cross-slope standard: min 2% / max 4% (Sec 35-506(d)(3)A) - not yet representable in this single-axis schema; enforce in review."
+  },
+
+  "generalLot": {
+    "unit": "percent",
+    "maxSlopePct": 25.0,
+    "minSlopePct": 1.0,
+    "notes": "Basis: UDC Sec 35-673(c)(2) requires graded (riverbank) slopes not to exceed 4:1 (25%) for erosion stability; grade changes over 10 vertical feet must be benched/terraced. Detention basin slopes must not exceed 3:1 (33.3%) (parkland/detention standard). No general-lot grading cap is stated in the UDC; 25% (4:1) adopted as the conservative stable-slope max. Min 1% for positive drainage (engineering default, not UDC-specified)."
+  },
+
+  "_comment_drivewayApproach": "The UDC does NOT specify a driveway-approach grade. Driveway approaches in the SA/Bexar area follow TxDOT 'Access Management' / driveway criteria and COSA transportation standards, not the UDC. Left null pending that source.",
+  "drivewayApproach": null,
+
+  "accessibleParking": null,
+  "accessibleRouteRunning": null,
+  "accessibleRouteCross": null,
+  "_comment_ada": "Accessible-surface limits are NOT taken from the UDC. They come from the federal 2010 ADA Standards (Sec 402/502) and the Texas Accessibility Standards (TAS, TDLR-enforced), which the tool already hardcodes as non-overridable floors. Only populate an accessible* field here to make a limit STRICTER than ADA; a looser value is rejected at load.",
+
+  "_comment_ratios": "H:V ratios. UDC references: 4:1 max stable graded slope (Sec 35-673), 3:1 max detention-basin slope. RetainingWallTrigger is an engineering-practice value (2:1), NOT a UDC-specified threshold - confirm against the COSA grading/retaining-wall standards before relying on it.",
+  "maxCutFillSlopeRatio": 3.0,
+  "retainingWallTriggerSlopeRatio": 2.0
+}

@@ -1,0 +1,38 @@
+{
+  "jurisdictionName": "City of Elgin, TX",
+  "sourceDocument": "PLACEHOLDER - City of Elgin Unified Development Code / Engineering Design Criteria. VALUES NOT YET VERIFIED against the live ordinance; confirm before production use.",
+  "lastVerifiedDate": "",
+  "statePlaneEpsg": 2277,
+
+  "standardParking": {
+    "unit": "percent",
+    "maxSlopePct": 5.0,
+    "minSlopePct": 1.0,
+    "notes": "PLACEHOLDER pending UDC verification. Asphalt parking bay."
+  },
+  "driveAisleOrRoad": {
+    "unit": "percent",
+    "maxSlopePct": 8.0,
+    "minSlopePct": 0.5,
+    "notes": "PLACEHOLDER pending UDC verification. Local road / drive aisle."
+  },
+  "generalLot": {
+    "unit": "percent",
+    "maxSlopePct": 25.0,
+    "minSlopePct": 1.0,
+    "notes": "PLACEHOLDER pending UDC verification. 4:1 max for mowable, stable slope."
+  },
+  "drivewayApproach": {
+    "unit": "percent",
+    "maxSlopePct": 10.0,
+    "minSlopePct": 1.0,
+    "notes": "PLACEHOLDER pending UDC verification."
+  },
+
+  "accessibleParking": null,
+  "accessibleRouteRunning": null,
+  "accessibleRouteCross": null,
+
+  "maxCutFillSlopeRatio": 3.0,
+  "retainingWallTriggerSlopeRatio": 2.0
+}

@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    WINDOWS + CIVIL 3D 2024 ONLY. This project cannot build on the macOS dev box:
+    Civil 3D is Windows-only and the referenced assemblies exist only inside a Civil 3D
+    2024 installation. It is deliberately NOT in GradingTool.sln so the Mac build stays
+    green. On the Windows machine, add it with:
+        dotnet sln add src/GradingTool.Civil3D/GradingTool.Civil3D.csproj
+    or open this csproj directly in Visual Studio 2022.
+  -->
+
+  <PropertyGroup>
+    <!-- Civil 3D 2024 hosts .NET Framework 4.8. -->
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <AssemblyName>GradingTool.Civil3D</AssemblyName>
+    <RootNamespace>GradingTool.Civil3D</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <!-- The add-in DLL is loaded by Civil 3D via NETLOAD; it is not a standalone app. -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!--
+      Path to the Civil 3D 2024 managed assemblies. Override on the command line if your
+      install is elsewhere:  dotnet build -p:AcadDir="D:\Autodesk\AutoCAD 2024\"
+    -->
+    <AcadDir Condition="'$(AcadDir)' == ''">C:\Program Files\Autodesk\AutoCAD 2024\</AcadDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GradingTool.Core\GradingTool.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    Autodesk assemblies: Private=false (CopyLocal off) because Civil 3D already has them
+    loaded in-process; shipping copies causes assembly-load conflicts. EmbedInteropTypes
+    off. If the build cannot find these, check $(AcadDir).
+  -->
+  <ItemGroup>
+    <Reference Include="acmgd">
+      <HintPath>$(AcadDir)acmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="acdbmgd">
+      <HintPath>$(AcadDir)acdbmgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="accoremgd">
+      <HintPath>$(AcadDir)accoremgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AecBaseMgd">
+      <HintPath>$(AcadDir)AecBaseMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="AeccDbMgd">
+      <HintPath>$(AcadDir)AeccDbMgd.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

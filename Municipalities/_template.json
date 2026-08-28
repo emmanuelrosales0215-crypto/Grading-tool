@@ -1,0 +1,43 @@
+{
+  "jurisdictionName": "REPLACE ME - e.g. City of Example",
+  "sourceDocument": "REPLACE ME - cite the exact ordinance/UDC section, e.g. 'Example UDC Ch. 5 Sec 5.4'",
+  "lastVerifiedDate": "",
+
+  "statePlaneEpsg": 2277,
+
+  "_comment_units": "Every slope rule MUST declare \"unit\": \"percent\" or \"ratio\". Required, not optional - a missing unit is a hard load error. It stops a 3:1 ratio being typed into a percent field and read as 3%. Percent is normal here; ratio is accepted and converted. The values below are the tool's conservative defaults - edit them to your jurisdiction and set lastVerifiedDate.",
+
+  "standardParking": {
+    "unit": "percent",
+    "maxSlopePct": 5.0,
+    "minSlopePct": 1.0,
+    "notes": "EDIT ME. Standard (non-accessible) parking bays."
+  },
+  "driveAisleOrRoad": {
+    "unit": "percent",
+    "maxSlopePct": 8.0,
+    "minSlopePct": 0.5,
+    "notes": "EDIT ME. Drive aisles and local roads."
+  },
+  "generalLot": {
+    "unit": "percent",
+    "maxSlopePct": 25.0,
+    "minSlopePct": 1.0,
+    "notes": "EDIT ME. General lot / open-area grading."
+  },
+  "drivewayApproach": {
+    "unit": "percent",
+    "maxSlopePct": 10.0,
+    "minSlopePct": 1.0,
+    "notes": "EDIT ME. Driveway approach from ROW to property line."
+  },
+
+  "_comment_ada": "The three accessible-surface fields are OPTIONAL. Include one only to make ADA STRICTER for this jurisdiction. A value looser than the ADA legal max (parking 2%, route running 5%, route cross 2%) is rejected at load. Omit (leave null) to use ADA as-is.",
+  "accessibleParking": null,
+  "accessibleRouteRunning": null,
+  "accessibleRouteCross": null,
+
+  "_comment_ratios": "Embankment and wall-trigger values are true H:V ratios: 3.0 means 3:1. Not percent, not rise/run.",
+  "maxCutFillSlopeRatio": 3.0,
+  "retainingWallTriggerSlopeRatio": 2.0
+}
