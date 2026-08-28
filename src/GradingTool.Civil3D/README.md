@@ -45,7 +45,21 @@ loaded in-process, and shipping copies causes assembly-load conflicts.
   triangles, so to grade a whole Civil 3D surface in 2D it needs a small adapter that
   enumerates Civil 3D's own triangles (`TinSurface` triangle/vertex API) and feeds their
   slope + centroid into the same rule check. Left as a follow-up because that triangle-
-  enumeration API could not be compile-verified on the dev box.
+  enumeration API could not be compile-verified on the dev box. **Run
+  `dynamo/explore_tin_api.py` to settle it** - a Python node can ask a live surface what its
+  API is, which is the thing a compiler on the dev box cannot do.
+- The slope stencil moved to `SlopeStencil` in Core, so `Civil3DSurface` no longer carries its
+  own copy and the math is finally covered by the test suite.
+
+## Faster loop: the Dynamo bridge
+
+Every change here costs a Windows build, `NETLOAD`, and a Civil 3D restart, and none of it can
+be compiled on the dev box. `dynamo/` avoids that: because `GradingTool.Core` is
+`netstandard2.0` with no Autodesk references, a Dynamo Python Script node can load it directly
+and drive the same solver against a live surface with no build step at all - see
+`dynamo/README.md`. `DelegateSurface` in Core is the seam that makes it work.
+
+Treat that as the iteration and diagnosis loop; this project stays the shipping form.
 
 ## Not compiled on the dev box
 

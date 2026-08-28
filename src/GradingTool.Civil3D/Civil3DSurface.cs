@@ -19,8 +19,10 @@ namespace GradingTool.Civil3D
     /// <para>
     /// Elevation comes from <c>FindElevationAtXY</c> (stable across Civil 3D releases); a
     /// query outside the surface throws, which is treated as "no data" (null). Slope is taken
-    /// by a small central-difference stencil around the point, which needs no triangle-level
-    /// API and matches the TIN's own planar slope to within the stencil size.
+    /// by <see cref="SlopeStencil"/>, a small central-difference stencil that needs no
+    /// triangle-level API and matches the TIN's own planar slope to within the stencil size.
+    /// That helper lives in Core so it is covered by the test suite, which this project - being
+    /// uncompilable without Civil 3D - is not.
     /// </para>
     /// </summary>
     public sealed class Civil3DSurface : ISurface
@@ -56,24 +58,8 @@ namespace GradingTool.Civil3D
         }
 
         /// <inheritdoc />
-        public SlopeSample? SlopeAt(double x, double y)
-        {
-            double h = _stencilFt;
-            double? zxp = ElevationAt(x + h, y);
-            double? zxm = ElevationAt(x - h, y);
-            double? zyp = ElevationAt(x, y + h);
-            double? zym = ElevationAt(x, y - h);
-            if (zxp == null || zxm == null || zyp == null || zym == null)
-                return null; // stencil ran off the surface edge
-
-            double gx = (zxp.Value - zxm.Value) / (2 * h); // rise/run in +X
-            double gy = (zyp.Value - zym.Value) / (2 * h); // rise/run in +Y
-            double slope = Math.Sqrt(gx * gx + gy * gy);
-            double aspect = slope < 1e-12
-                ? double.NaN
-                : Mod360(RadToDeg(Math.Atan2(-gx, -gy))); // downslope bearing, cw from north
-            return new SlopeSample(slope * 100.0, aspect);
-        }
+        public SlopeSample? SlopeAt(double x, double y) =>
+            SlopeStencil.CentralDifference(ElevationAt, x, y, _stencilFt);
 
         /// <inheritdoc />
         public (double MinX, double MinY, double MaxX, double MaxY) Extents
@@ -94,8 +80,5 @@ namespace GradingTool.Civil3D
                 return (e.MinPoint.Z, e.MaxPoint.Z);
             }
         }
-
-        private static double RadToDeg(double r) => r * 180.0 / Math.PI;
-        private static double Mod360(double d) { d %= 360.0; return d < 0 ? d + 360.0 : d; }
     }
 }
