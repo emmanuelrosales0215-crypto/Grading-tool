@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Core engine tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Deliberately targets the test project, NOT GradingTool.sln.
+      #
+      # src/GradingTool.Civil3D is Windows + Civil 3D only: it targets net48 and references
+      # assemblies that exist only inside a Civil 3D installation. It is kept out of the
+      # solution for that reason, but the add-in README tells you to run `dotnet sln add` on
+      # the Windows machine - and if that ever gets committed, building the solution here
+      # would fail on a missing acmgd.dll. Naming the test project keeps this job pinned to
+      # the part that is portable: it pulls in GradingTool.Core transitively and nothing else.
+      - name: Test
+        run: dotnet test tests/GradingTool.Core.Tests/GradingTool.Core.Tests.csproj
+             --configuration Release
+             --logger "console;verbosity=normal"

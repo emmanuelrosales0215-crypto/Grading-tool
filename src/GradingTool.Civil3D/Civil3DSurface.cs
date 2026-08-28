@@ -1,12 +1,15 @@
 using System;
-using Autodesk.Civil.DatabaseServices;
 using GradingTool.Surface;
 using CadExtents = Autodesk.AutoCAD.DatabaseServices.Extents3d;
+// Aliased, not imported: Autodesk.Civil.DatabaseServices and GradingTool.Surface BOTH define a
+// TinSurface, so importing both namespaces makes every bare reference ambiguous (CS0104). The
+// alias names the Civil 3D one explicitly and leaves the unqualified name to the engine's.
+using C3dTinSurface = Autodesk.Civil.DatabaseServices.TinSurface;
 
 namespace GradingTool.Civil3D
 {
     /// <summary>
-    /// Adapts a live Civil 3D <see cref="TinSurface"/> to the engine's <see cref="ISurface"/>
+    /// Adapts a live Civil 3D <see cref="C3dTinSurface"/> to the engine's <see cref="ISurface"/>
     /// contract. This is the production half of the hybrid: the solver and graders were built
     /// and unit-tested against the managed <c>TinSurface</c> on the dev box, and in Civil 3D
     /// they run against this adapter instead - same interface, same results, but now backed by
@@ -19,19 +22,21 @@ namespace GradingTool.Civil3D
     /// <para>
     /// Elevation comes from <c>FindElevationAtXY</c> (stable across Civil 3D releases); a
     /// query outside the surface throws, which is treated as "no data" (null). Slope is taken
-    /// by a small central-difference stencil around the point, which needs no triangle-level
-    /// API and matches the TIN's own planar slope to within the stencil size.
+    /// by <see cref="SlopeStencil"/>, a small central-difference stencil that needs no
+    /// triangle-level API and matches the TIN's own planar slope to within the stencil size.
+    /// That helper lives in Core so it is covered by the test suite, which this project - being
+    /// uncompilable without Civil 3D - is not.
     /// </para>
     /// </summary>
     public sealed class Civil3DSurface : ISurface
     {
-        private readonly TinSurface _surface;
+        private readonly C3dTinSurface _surface;
         private readonly double _stencilFt;
 
         /// <summary>Wrap a Civil 3D TIN surface.</summary>
         /// <param name="surface">The surface, open for read in the caller's transaction.</param>
         /// <param name="slopeStencilFt">Central-difference half-step for slope, in feet. Default 1.</param>
-        public Civil3DSurface(TinSurface surface, double slopeStencilFt = 1.0)
+        public Civil3DSurface(C3dTinSurface surface, double slopeStencilFt = 1.0)
         {
             _surface = surface ?? throw new ArgumentNullException(nameof(surface));
             _stencilFt = slopeStencilFt;
@@ -56,24 +61,8 @@ namespace GradingTool.Civil3D
         }
 
         /// <inheritdoc />
-        public SlopeSample? SlopeAt(double x, double y)
-        {
-            double h = _stencilFt;
-            double? zxp = ElevationAt(x + h, y);
-            double? zxm = ElevationAt(x - h, y);
-            double? zyp = ElevationAt(x, y + h);
-            double? zym = ElevationAt(x, y - h);
-            if (zxp == null || zxm == null || zyp == null || zym == null)
-                return null; // stencil ran off the surface edge
-
-            double gx = (zxp.Value - zxm.Value) / (2 * h); // rise/run in +X
-            double gy = (zyp.Value - zym.Value) / (2 * h); // rise/run in +Y
-            double slope = Math.Sqrt(gx * gx + gy * gy);
-            double aspect = slope < 1e-12
-                ? double.NaN
-                : Mod360(RadToDeg(Math.Atan2(-gx, -gy))); // downslope bearing, cw from north
-            return new SlopeSample(slope * 100.0, aspect);
-        }
+        public SlopeSample? SlopeAt(double x, double y) =>
+            SlopeStencil.CentralDifference(ElevationAt, x, y, _stencilFt);
 
         /// <inheritdoc />
         public (double MinX, double MinY, double MaxX, double MaxY) Extents
@@ -94,8 +83,5 @@ namespace GradingTool.Civil3D
                 return (e.MinPoint.Z, e.MaxPoint.Z);
             }
         }
-
-        private static double RadToDeg(double r) => r * 180.0 / Math.PI;
-        private static double Mod360(double d) { d %= 360.0; return d < 0 ? d + 360.0 : d; }
     }
 }

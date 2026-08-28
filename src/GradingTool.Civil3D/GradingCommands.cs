@@ -9,6 +9,11 @@ using GradingTool;
 using GradingTool.Grading;
 using GtPoint = GradingTool.Geometry.Point3d;
 using SurfaceUse = GradingTool.AdaComplianceStandards.SurfaceUse;
+// Civil 3D defines its own FeatureLine (the grading object), so with both namespaces imported
+// the bare name is ambiguous (CS0104). Station is aliased alongside it for the same reason and
+// to keep the pair reading as one thing - these are the engine's types, not the drawing's.
+using GtFeatureLine = GradingTool.Grading.FeatureLine;
+using GtStation = GradingTool.Grading.Station;
 
 [assembly: CommandClass(typeof(GradingTool.Civil3D.GradingCommands))]
 
@@ -91,15 +96,15 @@ namespace GradingTool.Civil3D
             var vertexIds = new List<ObjectId>();
             foreach (ObjectId vId in pl) vertexIds.Add(vId);
 
-            var stations = new List<Station>(vertexIds.Count);
+            var stations = new List<GtStation>(vertexIds.Count);
             for (int i = 0; i < vertexIds.Count; i++)
             {
                 var v = (PolylineVertex3d)tr.GetObject(vertexIds[i], OpenMode.ForRead);
                 bool endpoint = i == 0 || i == vertexIds.Count - 1;
-                stations.Add(new Station(new GtPoint(v.Position.X, v.Position.Y, v.Position.Z), isFixed: endpoint));
+                stations.Add(new GtStation(new GtPoint(v.Position.X, v.Position.Y, v.Position.Z), isFixed: endpoint));
             }
 
-            var line = new FeatureLine(pl.Handle.ToString(), use, stations);
+            var line = new GtFeatureLine(pl.Handle.ToString(), use, stations);
             var log = new EditorGradingLog(ed);
             var rules = new ConservativeGradingRules(municipality: null, log: log);
             GradingResult result = new GradingSolver(existing, rules, null, log).Solve(new[] { line });
