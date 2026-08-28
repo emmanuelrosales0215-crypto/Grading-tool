@@ -25,6 +25,7 @@ and the TIN math all stay in tested C#. Dynamo only does selection, orchestratio
 
 | File | What it is |
 | --- | --- |
+| `smoke_test.py` | Smallest first run: wraps a surface and reads elevation + slope at its centre. Proves the interop before you trust the engineering. **Start here.** |
 | `gradingtool_bridge.py` | `GRADELINE` as a Python node: surface + polyline in, findings and solved elevations out, optional write-back. |
 | `explore_tin_api.py` | One-off probe that reports a live `TinSurface`'s real triangle/vertex API. Answers the blocker recorded in the add-in README for 2D grading. |
 
