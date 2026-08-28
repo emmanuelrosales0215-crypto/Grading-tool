@@ -1,18 +1,28 @@
 """
-Smallest possible first run: prove the interop before trusting the engineering.
+BLOCKED - kept as the record of a dead end. Read dynamo/README.md before using this.
 
-Wraps a live Civil 3D surface in a DelegateSurface and reads elevation and slope at its
-centre. No solver, no feature line, no write-back - so if this fails, the problem is loading
-the DLL or talking to the surface, and if it passes, anything that fails afterwards is the
-grading logic or the polyline handling. Run this before gradingtool_bridge.py.
+This script gets as far as loading the engine and then dies, in Civil 3D 2024 with Dynamo's
+CPython3 engine, on the DelegateSurface construction below:
 
-    IN[0]  surface    Civil 3D TIN surface   <- Select Object node
+    PythonEvaluator.Evaluate operation failed.
+    Constructor on type 'System.Reflection.Emit.TypeBuilder' not found.
+
+Dynamo's CPython3 host blocks the Reflection.Emit that PythonNet needs to synthesise a .NET
+delegate from a Python function, so `System.Func[...](callable)` cannot be constructed at all.
+Reproduced in seven lines with no Civil 3D and no project DLL involved, so it is the host, not
+this code. The live path is the compiled add-in - see src/GradingTool.Civil3D.
+
+Everything ABOVE the delegate line is confirmed working against a real drawing, and is the
+useful part to keep: the assembly load, the surface unwrap, the transaction.
+
+    IN[0]  surface    Civil 3D TIN surface          <- Select Object node
     IN[1]  core_dll   path to GradingTool.Core.dll  <- File Path node
-    OUT    a few lines you can eyeball against Civil 3D's own surface properties
 """
 
 import clr
 import System
+from System.IO import File
+from System.Reflection import Assembly
 
 clr.AddReference("AcDbMgd")
 clr.AddReference("AcMgd")
@@ -22,7 +32,24 @@ clr.AddReference("AeccDbMgd")
 from Autodesk.AutoCAD.ApplicationServices import Application
 from Autodesk.AutoCAD.DatabaseServices import OpenMode
 
-clr.AddReferenceToFileAndPath(IN[1])
+
+def load_engine(path):
+    """Load GradingTool.Core, whatever the engine and whatever Windows thinks of the file.
+
+    Three ways to get this wrong, all found the hard way:
+      - clr.AddReferenceToFileAndPath is IronPython-only; PythonNet has no such attribute.
+      - PythonNet 3 dropped sys.path probing, so clr.AddReference("GradingTool.Core") fails.
+      - Assembly.LoadFrom refuses a file carrying Windows' mark-of-the-web with
+        HRESULT 0x80131515, which is every DLL anyone downloads.
+    Reading the bytes and loading those sidesteps the zone check entirely.
+    """
+    if hasattr(clr, "AddReferenceToFileAndPath"):   # IronPython
+        clr.AddReferenceToFileAndPath(path)
+    else:                                            # PythonNet
+        Assembly.Load(File.ReadAllBytes(path))
+
+
+load_engine(IN[1])
 from GradingTool.Surface import DelegateSurface
 
 report = []
@@ -39,6 +66,8 @@ with document.TransactionManager.StartTransaction() as transaction:
             return DelegateSurface.Outside
 
     extents = surface.GeometricExtents
+
+    # ---- everything below this line is unreachable on CPython3 --------------------------
     wrapped = DelegateSurface(
         surface.Name,
         System.Func[System.Double, System.Double, System.Double](elevation_at),
@@ -65,8 +94,6 @@ with document.TransactionManager.StartTransaction() as transaction:
     else:
         report.append("  slope: %.3f%% toward %.1f deg" % (slope.SlopePct, slope.AspectDegrees))
 
-    # Must read as outside - a point far beyond the extents proves the NaN convention is
-    # surviving the Python -> .NET hop, which is the one thing most likely to be wrong.
     far = wrapped.ElevationAt(extents.MaxPoint.X + 10000.0, extents.MaxPoint.Y + 10000.0)
     report.append("far-away point reads as outside: %s" % (far is None))
 

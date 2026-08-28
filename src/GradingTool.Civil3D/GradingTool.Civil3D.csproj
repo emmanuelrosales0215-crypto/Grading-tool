@@ -17,8 +17,12 @@
     <AssemblyName>GradingTool.Civil3D</AssemblyName>
     <RootNamespace>GradingTool.Civil3D</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <!-- The add-in DLL is loaded by Civil 3D via NETLOAD; it is not a standalone app. -->
-    <UseWindowsForms>true</UseWindowsForms>
+    <!--
+      No UseWindowsForms. It is a .NET Core-era property that misbehaves on net48, and nothing
+      here uses WinForms - the commands prompt through the Civil 3D editor, and diagnostics go
+      to the command line via EditorGradingLog. The add-in DLL is loaded by NETLOAD; it is not
+      a standalone app and needs no UI framework.
+    -->
 
     <!--
       Path to the Civil 3D 2024 managed assemblies. Override on the command line if your
@@ -29,6 +33,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GradingTool.Core\GradingTool.Core.csproj" />
+    <!--
+      Supplies the net48 targeting pack from NuGet, so `dotnet build` works with nothing but
+      the .NET SDK installed - no Visual Studio and no separate targeting-pack installer on the
+      Civil 3D machine. PrivateAssets="all" keeps it out of anything that references this
+      project; it is a build-time-only dependency.
+    -->
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
   </ItemGroup>
 
   <!--

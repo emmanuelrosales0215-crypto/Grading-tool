@@ -11,6 +11,10 @@ update the assembly paths.)
 
 ## Building (on the Windows machine)
 
+Only the **.NET SDK 8** is required — no Visual Studio. The project pulls the `net48` targeting
+pack from NuGet (`Microsoft.NETFramework.ReferenceAssemblies`), so `dotnet build` works on a
+machine with nothing but the SDK and Civil 3D installed.
+
 1. Confirm the Civil 3D 2024 managed assemblies are at the default path
    `C:\Program Files\Autodesk\AutoCAD 2024\` (acmgd.dll, acdbmgd.dll, accoremgd.dll,
    AecBaseMgd.dll, AeccDbMgd.dll). If your install is elsewhere, pass it:
@@ -51,15 +55,16 @@ loaded in-process, and shipping copies causes assembly-load conflicts.
 - The slope stencil moved to `SlopeStencil` in Core, so `Civil3DSurface` no longer carries its
   own copy and the math is finally covered by the test suite.
 
-## Faster loop: the Dynamo bridge
+## The Dynamo bridge was tried, and does not work
 
-Every change here costs a Windows build, `NETLOAD`, and a Civil 3D restart, and none of it can
-be compiled on the dev box. `dynamo/` avoids that: because `GradingTool.Core` is
-`netstandard2.0` with no Autodesk references, a Dynamo Python Script node can load it directly
-and drive the same solver against a live surface with no build step at all - see
-`dynamo/README.md`. `DelegateSurface` in Core is the seam that makes it work.
+`dynamo/` holds an attempt to skip this project entirely by driving the engine from a Dynamo
+Python node. It failed: Dynamo's CPython3 host blocks the `Reflection.Emit` that PythonNet needs
+to build a .NET delegate from a Python function, so `DelegateSurface` cannot be constructed
+there. See `dynamo/README.md` for the four interop problems found and which three were solved.
 
-Treat that as the iteration and diagnosis loop; this project stays the shipping form.
+This project is therefore the only working path to a live drawing, not merely the shipping form.
+One script survives and is still worth running: `dynamo/explore_tin_api.py` needs no delegates
+and answers the triangle-enumeration question in the TODO below.
 
 ## Not compiled on the dev box
 

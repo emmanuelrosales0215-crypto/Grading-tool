@@ -1,12 +1,20 @@
 """
-GRADELINE, as a Dynamo for Civil 3D Python Script node.
+BLOCKED - kept as the record of a dead end. Read dynamo/README.md before using this.
 
-Paste this into a Python Script node with five inputs. It does what the GRADELINE command
-does in src/GradingTool.Civil3D/GradingCommands.cs - read a TIN surface and a 3D polyline,
-run the tested GradingTool.Core solver, report findings, optionally write the solved
-elevations back - but it needs no Windows build: GradingTool.Core is netstandard2.0 and
-references no Autodesk assembly, so Dynamo can load it straight from a `dotnet build` output
-produced on any machine.
+GRADELINE as a Dynamo Python node. The design was: hand DelegateSurface a Python callback so a
+graph could drive the tested engine with no Windows build. Live testing in Civil 3D 2024 killed
+it - Dynamo's CPython3 host blocks the Reflection.Emit that PythonNet needs to build a .NET
+delegate from a Python function, so `System.Func[...](callable)` raises:
+
+    Constructor on type 'System.Reflection.Emit.TypeBuilder' not found.
+
+Reproduced in seven lines with no Civil 3D and no project DLL, so it is the host, not this code.
+The live path is the compiled add-in: src/GradingTool.Civil3D, command GRADELINE.
+
+What this script proved DOES work, and is worth keeping:
+  - loading the netstandard2.0 engine into Civil 3D's .NET Framework host (see load_engine)
+  - unwrapping a Select Object node's wrapper via InternalObjectId
+  - reading a Polyline3d's vertices inside a transaction
 
     IN[0]  surface       Civil 3D TIN surface      <- Select Object node
     IN[1]  polyline      3D polyline to grade      <- Select Object node
@@ -15,9 +23,6 @@ produced on any machine.
     IN[4]  core_dll      full path to GradingTool.Core.dll       <- File Path node
 
     OUT    [summary, [findings], [solved elevations]]
-
-Wiring, traps and the 2024-vs-2025 runtime split are covered in dynamo/README.md. Read that
-before the first run - in particular, set Dynamo's Geometry Scaling to Medium.
 """
 
 import clr
@@ -36,8 +41,27 @@ from Autodesk.AutoCAD.Geometry import Point3d as AcadPoint3d
 from Autodesk.Civil.DatabaseServices import TinSurface as C3dTinSurface
 
 # --- The engine ---------------------------------------------------------------------------
-core_dll = IN[4]
-clr.AddReferenceToFileAndPath(core_dll)
+from System.IO import File
+from System.Reflection import Assembly
+
+
+def load_engine(path):
+    """Load GradingTool.Core, whatever the engine and whatever Windows thinks of the file.
+
+    Three ways to get this wrong, all found the hard way:
+      - clr.AddReferenceToFileAndPath is IronPython-only; PythonNet has no such attribute.
+      - PythonNet 3 dropped sys.path probing, so clr.AddReference("GradingTool.Core") fails.
+      - Assembly.LoadFrom refuses a file carrying Windows' mark-of-the-web with
+        HRESULT 0x80131515, which is every DLL anyone downloads.
+    Reading the bytes and loading those sidesteps the zone check entirely.
+    """
+    if hasattr(clr, "AddReferenceToFileAndPath"):   # IronPython
+        clr.AddReferenceToFileAndPath(path)
+    else:                                            # PythonNet
+        Assembly.Load(File.ReadAllBytes(path))
+
+
+load_engine(IN[4])
 
 from GradingTool import AdaComplianceStandards, ConservativeGradingRules
 from GradingTool.Geometry import Point3d as GtPoint3d
@@ -62,10 +86,10 @@ def object_id(dynamo_object):
 def wrap_surface(c3d_surface, stencil_ft=1.0):
     """Present a live Civil 3D surface to the engine as an ISurface.
 
-    DelegateSurface exists for exactly this: it takes a plain callback rather than
-    requiring a compiled adapter class, so the interop can live in Python. The NaN
-    convention matters - FindElevationAtXY *throws* outside the surface, and the engine
-    needs that turned into "no data here", not an exception.
+    THIS IS THE LINE THAT CANNOT RUN on Dynamo's CPython3: constructing System.Func from a
+    Python callable needs Reflection.Emit, which the host blocks. The C# equivalent in the
+    add-in (Civil3DSurface) has no such problem - it implements ISurface directly, with no
+    delegate to synthesise.
     """
     def elevation_at(x, y):
         try:

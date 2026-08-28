@@ -1,96 +1,77 @@
-# Dynamo bridge
+# Dynamo bridge — what we learned, and why it isn't the path
 
-Runs the tested `GradingTool.Core` engine against a live Civil 3D surface from a Dynamo
-Python Script node — **with no Windows build step**.
+**Status: blocked.** Driving the grading engine from a Dynamo Python node does not work in
+Civil 3D 2024 with the CPython3 engine. The live path is the compiled add-in,
+[`src/GradingTool.Civil3D`](../src/GradingTool.Civil3D). This directory is kept because the
+findings below cost real time to establish and one of the scripts is still useful.
 
-## Why this exists
+## The idea
 
-`src/GradingTool.Civil3D/` is the shipping form of the tool, but it can only be built on a
-Windows machine with Civil 3D installed, and every change costs a build + `NETLOAD` + Civil 3D
-restart. This path skips all of it:
+`GradingTool.Core` is `netstandard2.0` and references no Autodesk assembly, so Dynamo can load
+it directly. `DelegateSurface` was added so a Python callback could stand in for `ISurface`,
+which would have let a graph run the tested solver against a live Civil 3D surface with **no
+Windows build step**. The add-in had never been compiled — no machine with Civil 3D was
+available at the time — so this looked like the faster road to a real drawing.
 
-- `GradingTool.Core` is `netstandard2.0` and references **no** Autodesk assembly, so it builds
-  anywhere `dotnet` runs and loads into Civil 3D 2024 (.NET Framework 4.8) and 2025+ (.NET 8)
-  alike.
-- `DelegateSurface` (`src/GradingTool.Core/Surface/DelegateSurface.cs`) lets a plain Python
-  callback stand in for `ISurface`, so the Civil 3D interop can live in a script instead of a
-  compiled adapter.
-- A Python node edits and re-runs in seconds, and can *ask* the API what it supports rather
-  than guessing at it — which is what `explore_tin_api.py` is for.
+## What actually happened, in order
 
-The engine is unchanged and untouchable from here: the solver, the ADA and municipality rules,
-and the TIN math all stay in tested C#. Dynamo only does selection, orchestration and display.
+Tested live in Civil 3D 2024, Dynamo 3.x, CPython3 engine:
+
+| # | Problem | Resolution |
+| --- | --- | --- |
+| 1 | `clr.AddReferenceToFileAndPath` → `AttributeError` | IronPython-only API; PythonNet has no such attribute |
+| 2 | `clr.AddReference("GradingTool.Core")` → `FileNotFoundException` | PythonNet 3 dropped `sys.path` assembly probing |
+| 3 | `Assembly.LoadFrom(path)` → `FileLoadException`, HRESULT `0x80131515` | Windows mark-of-the-web on a downloaded DLL. **Fix:** `Assembly.Load(File.ReadAllBytes(path))`, which skips the zone check. Ticking *Unblock* in the file's Properties is the manual equivalent |
+| 4 | `System.Func[Double, Double, Double](fn)` → `Constructor on type 'System.Reflection.Emit.TypeBuilder' not found` | **Fatal.** No fix |
+
+Problems 1–3 are solved, and this is confirmed working against a real drawing: the
+`netstandard2.0` engine loads into Civil 3D's .NET Framework host, its types import, a
+`Select Object` node's wrapper unwraps via `InternalObjectId`, and a transaction reads the
+surface.
+
+Problem 4 is the wall. Dynamo's CPython3 host blocks the `Reflection.Emit` that PythonNet needs
+to synthesise a .NET delegate from a Python function, so `System.Func[...](callable)` cannot be
+constructed at all. It reproduces in seven lines with no Civil 3D and no project DLL:
+
+```python
+from System import Func, Double
+def f(x, y): return x + y
+d = Func[Double, Double, Double](f)     # TypeBuilder error
+```
+
+So it is the host, not our code. `DelegateSurface` is sound C# with 12 passing tests — it is
+simply not reachable from Python here.
 
 ## Files
 
-| File | What it is |
+| File | State |
 | --- | --- |
-| `smoke_test.py` | Smallest first run: wraps a surface and reads elevation + slope at its centre. Proves the interop before you trust the engineering. **Start here.** |
-| `gradingtool_bridge.py` | `GRADELINE` as a Python node: surface + polyline in, findings and solved elevations out, optional write-back. |
-| `explore_tin_api.py` | One-off probe that reports a live `TinSurface`'s real triangle/vertex API. Answers the blocker recorded in the add-in README for 2D grading. |
+| `explore_tin_api.py` | **Works.** Uses no delegates and no project DLL — pure Civil 3D introspection. Reports a live `TinSurface`'s real triangle/vertex API, which is what blocks whole-surface 2D grading in `SurfaceGrader`. Still worth running. |
+| `smoke_test.py` | Blocked at the delegate line. Everything above it is confirmed working. |
+| `gradingtool_bridge.py` | Blocked at the same line. |
 
-## Setup
+## If you want to revive this
 
-1. **Build Core** on any machine with the .NET SDK:
+Two routes, neither taken:
 
-   ```
-   dotnet build src/GradingTool.Core -c Release
-   ```
+- **Pass data, not functions.** A `GridSurface : ISurface` in Core, built from a sampled
+  elevation array that Python fills with `FindElevationAtXY` calls. Arrays marshal fine without
+  `Reflection.Emit`. Cost: a resampled grid approximates Civil 3D's TIN and softens breaklines,
+  where the callback would have been exact.
+- **A newer host.** Civil 3D 2025.1+ moved Dynamo to .NET 8 / Dynamo Core 3.x / PythonNet3. If
+  that host permits `Reflection.Emit`, the existing scripts may work as written once the
+  byte-loading fix is in — which it now is.
 
-   Copy `src/GradingTool.Core/bin/Release/netstandard2.0/GradingTool.Core.dll` to the Civil 3D
-   machine. Nothing else is needed for the default configuration.
+## The one trap worth remembering
 
-2. **Set Geometry Scaling to Medium** — Dynamo → Settings → Geometry Scaling. Civil 3D
-   coordinates are large enough that the Large/Extra Large settings make geometry-based nodes
-   return nulls. This bites everyone once.
+If you load any DLL from a Dynamo Python node, **byte-load it**:
 
-3. **Build the graph**:
+```python
+from System.IO import File
+from System.Reflection import Assembly
+Assembly.Load(File.ReadAllBytes(path))
+```
 
-   ```
-   Select Object  ──> IN[0]   (the existing TIN surface)
-   Select Object  ──> IN[1]   (the proposed 3D polyline)
-   String         ──> IN[2]   ("StandardParking", "AccessibleRoute", ...)
-   Boolean        ──> IN[3]   (write solved elevations back?)
-   File Path      ──> IN[4]   (full path to GradingTool.Core.dll)
-                      │
-                Python Script  ──> Watch
-   ```
-
-   Paste `gradingtool_bridge.py` into the Python Script node and set its input count to 5.
-   `IN[2]` accepts any member name of `AdaComplianceStandards.SurfaceUse`.
-
-4. Run it. `OUT` is `[summary, [findings], [solved elevations]]`.
-
-Once the graph works, save it and run it from **Dynamo Player** — an engineer then picks a
-surface and a polyline and clicks play, without ever opening the node editor. `U` in Civil 3D
-undoes a run.
-
-## Known trap: municipality configs on Civil 3D 2024
-
-The bridge passes `ConservativeGradingRules()` with no municipality, matching what the
-`GRADELINE` command does today. That is deliberate: loading a config from `Municipalities/`
-goes through `System.Text.Json`, which on Civil 3D **2024** (.NET Framework 4.8) drags in
-`System.Memory`, `System.Buffers` and friends, and assembly binding conflicts inside AutoCAD
-are a well-known nuisance.
-
-If you need jurisdiction rules in the graph:
-
-- On **2025+** (.NET 8) it just works — reference `MunicipalityConfig.Load` and go.
-- On **2024**, `dotnet publish src/GradingTool.Core -c Release` and point
-  `clr.AddReferenceToFileAndPath` at the DLL inside the full publish output, so its
-  dependencies sit beside it.
-
-## Version split
-
-Civil 3D 2025.1 moved Dynamo to .NET 8, Dynamo Core 3.x and PythonNet3; 2024 and earlier are
-.NET Framework 4.8 with Dynamo Core 2.x. `GradingTool.Core.dll` spans both — it is
-`netstandard2.0` precisely so it does not have to be rebuilt per host. What does *not* span
-both is third-party Dynamo packages and, occasionally, Python engine selection; these scripts
-use only built-in nodes and the standard library to stay clear of that.
-
-## Verifying against the add-in
-
-Once `GradingTool.Civil3D` is first built on the Windows machine, run `GRADELINE` and this
-graph on the same surface and polyline. The findings and solved elevations must match — same
-engine, two front ends — so any divergence is an interop bug in the bridge, not an engineering
-difference.
+`Assembly.LoadFrom` fails on anything Windows has marked as downloaded, which is every DLL that
+arrives by email, browser, or chat. The error (`0x80131515`, "Operation is not supported") names
+nothing about blocking, so it is a genuinely hard hour to lose.

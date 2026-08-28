@@ -1,12 +1,15 @@
 using System;
-using Autodesk.Civil.DatabaseServices;
 using GradingTool.Surface;
 using CadExtents = Autodesk.AutoCAD.DatabaseServices.Extents3d;
+// Aliased, not imported: Autodesk.Civil.DatabaseServices and GradingTool.Surface BOTH define a
+// TinSurface, so importing both namespaces makes every bare reference ambiguous (CS0104). The
+// alias names the Civil 3D one explicitly and leaves the unqualified name to the engine's.
+using C3dTinSurface = Autodesk.Civil.DatabaseServices.TinSurface;
 
 namespace GradingTool.Civil3D
 {
     /// <summary>
-    /// Adapts a live Civil 3D <see cref="TinSurface"/> to the engine's <see cref="ISurface"/>
+    /// Adapts a live Civil 3D <see cref="C3dTinSurface"/> to the engine's <see cref="ISurface"/>
     /// contract. This is the production half of the hybrid: the solver and graders were built
     /// and unit-tested against the managed <c>TinSurface</c> on the dev box, and in Civil 3D
     /// they run against this adapter instead - same interface, same results, but now backed by
@@ -27,13 +30,13 @@ namespace GradingTool.Civil3D
     /// </summary>
     public sealed class Civil3DSurface : ISurface
     {
-        private readonly TinSurface _surface;
+        private readonly C3dTinSurface _surface;
         private readonly double _stencilFt;
 
         /// <summary>Wrap a Civil 3D TIN surface.</summary>
         /// <param name="surface">The surface, open for read in the caller's transaction.</param>
         /// <param name="slopeStencilFt">Central-difference half-step for slope, in feet. Default 1.</param>
-        public Civil3DSurface(TinSurface surface, double slopeStencilFt = 1.0)
+        public Civil3DSurface(C3dTinSurface surface, double slopeStencilFt = 1.0)
         {
             _surface = surface ?? throw new ArgumentNullException(nameof(surface));
             _stencilFt = slopeStencilFt;
